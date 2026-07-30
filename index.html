@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Weather Dashboard</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js for real-time graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen p-6 font-sans">
+
+    <div class="max-w-5xl mx-auto w-full bg-slate-800 rounded-2xl shadow-2xl p-8 border border-slate-700">
+        
+        <div class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">
+                ESP32 Real-Time Sensor Cloud
+            </h1>
+            <p class="text-slate-400 mt-2" id="last-updated">Waiting for initial data...</p>
+        </div>
+
+        <!-- Current Value Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <!-- Temperature Card -->
+            <div class="bg-slate-700/50 rounded-xl p-6 border border-slate-600 flex flex-col items-center justify-center">
+                <h2 class="text-slate-400 uppercase tracking-widest text-sm font-semibold mb-2">Current Temperature</h2>
+                <div class="flex items-baseline space-x-1">
+                    <span id="temp-val" class="text-5xl font-black text-blue-400">--</span>
+                    <span class="text-2xl text-slate-500 font-bold">&deg;C</span>
+                </div>
+            </div>
+
+            <!-- Humidity Card -->
+            <div class="bg-slate-700/50 rounded-xl p-6 border border-slate-600 flex flex-col items-center justify-center">
+                <h2 class="text-slate-400 uppercase tracking-widest text-sm font-semibold mb-2">Current Humidity</h2>
+                <div class="flex items-baseline space-x-1">
+                    <span id="hum-val" class="text-5xl font-black text-emerald-400">--</span>
+                    <span class="text-2xl text-slate-500 font-bold">%</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Graphs -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-slate-900/50 rounded-xl p-4 border border-slate-600">
+                <canvas id="tempChart"></canvas>
+            </div>
+            <div class="bg-slate-900/50 rounded-xl p-4 border border-slate-600">
+                <canvas id="humChart"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- REPLACE THESE WITH YOUR THINGSPEAK DETAILS ---
+        const CHANNEL_ID = '3440426'; 
+        const READ_API_KEY = 'CSXAYSGDH3WIA1B4';
+        // --------------------------------------------------
+
+        const URL = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${READ_API_KEY}&results=1`;
+
+        // We store the last entry ID so we don't plot the exact same data point twice 
+        // if the browser checks before the ESP32 has uploaded a new one.
+        let lastEntryId = null;
+
+        // Chart Configuration Variables
+        const MAX_DATA_POINTS = 30; // Keeps the graph from getting too squished over time
+
+        // Common Chart.js options for a clean, dark-mode look
+        const commonOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+                y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+            },
+            plugins: { legend: { display: false } },
+            animation: { duration: 400 }
+        };
+
+        // Initialize Temperature Chart
+        const ctxTemp = document.getElementById('tempChart').getContext('2d');
+        const tempChart = new Chart(ctxTemp, {
+            type: 'line',
+            data: {
+                labels: [], 
+                datasets: [{
+                    label: 'Temperature (°C)',
+                    borderColor: '#60a5fa', // blue-400
+                    backgroundColor: 'rgba(96, 165, 250, 0.1)',
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#60a5fa',
+                    fill: true,
+                    data: []
+                }]
+            },
+            options: { ...commonOptions, plugins: { title: { display: true, text: 'Temperature Trend', color: '#94a3b8' }, legend: { display: false } } }
+        });
+
+        // Initialize Humidity Chart
+        const ctxHum = document.getElementById('humChart').getContext('2d');
+        const humChart = new Chart(ctxHum, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Humidity (%)',
+                    borderColor: '#34d399', // emerald-400
+                    backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#34d399',
+                    fill: true,
+                    data: []
+                }]
+            },
+            options: { ...commonOptions, plugins: { title: { display: true, text: 'Humidity Trend', color: '#94a3b8' }, legend: { display: false } } }
+        });
+
+        // Function to fetch data and update charts
+        async function fetchSensorData() {
+            try {
+                const response = await fetch(URL);
+                const data = await response.json();
+
+                if (data.feeds && data.feeds.length > 0) {
+                    const latestFeed = data.feeds[0];
+                    
+                    // Only update if it's a genuinely new data point from the ESP32
+                    if (latestFeed.entry_id !== lastEntryId) {
+                        lastEntryId = latestFeed.entry_id;
+
+                        const temp = parseFloat(latestFeed.field1).toFixed(1);
+                        const hum = parseFloat(latestFeed.field2).toFixed(1);
+                        
+                        // Extract just the HH:MM:SS part of the timestamp
+                        const timeString = new Date(latestFeed.created_at).toLocaleTimeString();
+
+                        // Update large numbers text
+                        document.getElementById('temp-val').innerText = temp;
+                        document.getElementById('hum-val').innerText = hum;
+                        document.getElementById('last-updated').innerText = `Live status: Synchronized at ${timeString}`;
+
+                        // Update Charts Arrays
+                        tempChart.data.labels.push(timeString);
+                        tempChart.data.datasets[0].data.push(temp);
+
+                        humChart.data.labels.push(timeString);
+                        humChart.data.datasets[0].data.push(hum);
+
+                        // If we have more than MAX_DATA_POINTS, remove the oldest one from the left
+                        if (tempChart.data.labels.length > MAX_DATA_POINTS) {
+                            tempChart.data.labels.shift();
+                            tempChart.data.datasets[0].data.shift();
+                            
+                            humChart.data.labels.shift();
+                            humChart.data.datasets[0].data.shift();
+                        }
+
+                        // Tell Chart.js to redraw with the new arrays
+                        tempChart.update();
+                        humChart.update();
+                    }
+                }
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                document.getElementById('last-updated').innerText = "Connection warning: Retrying...";
+            }
+        }
+
+        // Fetch immediately, then every 20 seconds
+        fetchSensorData();
+        setInterval(fetchSensorData, 20000);
+    </script>
+</body>
+</html>
