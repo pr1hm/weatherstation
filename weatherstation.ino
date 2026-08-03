@@ -10,7 +10,7 @@ DHT dht(DHTPIN, DHTTYPE);
 // --- REPLACE THESE WITH YOUR DETAILS ---
 const char* ssid = "WIFI/HOTSPOT_NAME";           // Your home network name
 const char* password = "WIFI/HOTSPOT_PASS";   // Your Wi-Fi password
-String apiKey = "CGURAAXTKRGPJN4B"; // The Write API Key from Step 5
+String apiKey = "<THINGSPEAK_WRITE_API_KEY>"; // The Write API Key from Step 5
 // ---------------------------------------
 
 const char* server = "http://api.thingspeak.com/update";
