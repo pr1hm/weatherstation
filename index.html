@@ -2,178 +2,378 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Weather Dashboard</title>
-    <!-- Tailwind CSS for styling -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Live Environment Dashboard</title>
+    
+    <!-- Fonts: Inter for Apple-like typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js for real-time graphs -->
+    
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body class="bg-slate-900 text-white min-h-screen p-6 font-sans">
 
-    <div class="max-w-5xl mx-auto w-full bg-slate-800 rounded-2xl shadow-2xl p-8 border border-slate-700">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f1f5f9;
+        }
+
+        /* Animated Liquid Mesh Background - Fixed to avoid mobile scroll clipping */
+        .liquid-bg {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background-color: #f8fafc;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .blob {
+            position: absolute;
+            filter: blur(90px);
+            z-index: 1;
+            opacity: 0.6;
+            animation: float 22s infinite ease-in-out alternate;
+        }
+
+        .blob-1 {
+            top: -10%; left: -10%;
+            width: 55vw; height: 55vw;
+            background: #e0f2fe; /* Light sky */
+            animation-delay: 0s;
+        }
+
+        .blob-2 {
+            bottom: -15%; right: -10%;
+            width: 65vw; height: 65vw;
+            background: #ccfbf1; /* Light teal/emerald */
+            animation-delay: -4s;
+        }
+
+        .blob-3 {
+            top: 35%; left: 25%;
+            width: 45vw; height: 45vw;
+            background: #f3e8ff; /* Light purple */
+            animation-delay: -9s;
+        }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(6%, 12%) scale(1.05); }
+            66% { transform: translate(-4%, 6%) scale(0.95); }
+            100% { transform: translate(0, 0) scale(1); }
+        }
+
+        /* Heavy Glassmorphism Panel */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.55);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.9);
+            box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.05);
+            border-radius: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .glass-panel { border-radius: 1.5rem; }
+        }
+    </style>
+</head>
+
+<body class="text-slate-800 relative min-h-[100dvh] md:h-[100dvh] md:overflow-hidden p-4 sm:p-6 md:p-8 flex items-center justify-center">
+
+    <!-- Background Elements -->
+    <div class="liquid-bg">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <!-- Main Container: Auto height on mobile, 100% height on desktop -->
+    <div class="relative z-10 w-full h-full max-w-7xl mx-auto flex flex-col gap-4 sm:gap-6">
         
-        <div class="text-center mb-8">
-            <h1 class="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">
-                ESP32 Real-Time Sensor Cloud
-            </h1>
-            <p class="text-slate-400 mt-2" id="last-updated">Waiting for initial data...</p>
-        </div>
+        <!-- Header -->
+        <header class="glass-panel flex-none p-5 sm:p-6 md:p-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="text-center sm:text-left">
+                <h1 class="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight text-slate-800">
+                    Environment <span id="main-title-word" class="font-light text-slate-500">Live</span>
+                </h1>
+                <p class="text-xs sm:text-sm text-slate-500 mt-1 font-medium" id="last-updated">Synchronizing historical data...</p>
+            </div>
+            <div class="flex items-center space-x-2 sm:space-x-3 bg-white/70 px-4 py-2 rounded-full border border-white/80 shadow-sm">
+                <div id="status-dot" class="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]"></div>
+                <span id="status-text" class="text-xs sm:text-sm font-semibold tracking-wide text-slate-600 uppercase">Live Sync</span>
+            </div>
+        </header>
 
         <!-- Current Value Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div class="flex-none grid grid-cols-2 gap-4 sm:gap-6">
             <!-- Temperature Card -->
-            <div class="bg-slate-700/50 rounded-xl p-6 border border-slate-600 flex flex-col items-center justify-center">
-                <h2 class="text-slate-400 uppercase tracking-widest text-sm font-semibold mb-2">Current Temperature</h2>
-                <div class="flex items-baseline space-x-1">
-                    <span id="temp-val" class="text-5xl font-black text-blue-400">--</span>
-                    <span class="text-2xl text-slate-500 font-bold">&deg;C</span>
+            <div class="glass-panel p-5 sm:p-8 flex flex-col justify-center items-center relative overflow-hidden group">
+                <div class="absolute top-4 sm:top-5 left-4 sm:left-6 right-4 sm:right-6 flex justify-between items-start w-auto">
+                    <h2 class="text-slate-500 uppercase tracking-widest text-[10px] sm:text-xs font-semibold">Temperature</h2>
+                    <svg class="w-4 h-4 sm:w-5 sm:h-5 text-blue-400 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                </div>
+                <div class="flex items-baseline space-x-1 sm:space-x-2 mt-6 sm:mt-8">
+                    <span id="temp-val" class="text-5xl sm:text-6xl md:text-7xl font-light tracking-tighter text-slate-800 transition-opacity duration-300">--</span>
+                    <span class="text-xl sm:text-2xl md:text-3xl text-slate-400 font-light">&deg;C</span>
                 </div>
             </div>
 
             <!-- Humidity Card -->
-            <div class="bg-slate-700/50 rounded-xl p-6 border border-slate-600 flex flex-col items-center justify-center">
-                <h2 class="text-slate-400 uppercase tracking-widest text-sm font-semibold mb-2">Current Humidity</h2>
-                <div class="flex items-baseline space-x-1">
-                    <span id="hum-val" class="text-5xl font-black text-emerald-400">--</span>
-                    <span class="text-2xl text-slate-500 font-bold">%</span>
+            <div class="glass-panel p-5 sm:p-8 flex flex-col justify-center items-center relative overflow-hidden group">
+                <div class="absolute top-4 sm:top-5 left-4 sm:left-6 right-4 sm:right-6 flex justify-between items-start w-auto">
+                    <h2 class="text-slate-500 uppercase tracking-widest text-[10px] sm:text-xs font-semibold">Humidity</h2>
+                    <svg class="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                </div>
+                <div class="flex items-baseline space-x-1 sm:space-x-2 mt-6 sm:mt-8">
+                    <span id="hum-val" class="text-5xl sm:text-6xl md:text-7xl font-light tracking-tighter text-slate-800 transition-opacity duration-300">--</span>
+                    <span class="text-xl sm:text-2xl md:text-3xl text-slate-400 font-light">%</span>
                 </div>
             </div>
         </div>
 
-        <!-- Graphs -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="bg-slate-900/50 rounded-xl p-4 border border-slate-600">
-                <canvas id="tempChart"></canvas>
+        <!-- Charts Container: Natural height on mobile, flex-1 min-h-0 on desktop -->
+        <div class="flex-1 md:min-h-0 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 pb-4 md:pb-0">
+            
+            <div class="glass-panel p-4 sm:p-6 flex flex-col relative h-[300px] md:h-full">
+                <h3 class="text-slate-500 text-xs sm:text-sm font-semibold mb-2 sm:mb-4 ml-1">Temperature History</h3>
+                <div class="flex-1 w-full h-full relative min-h-0">
+                    <canvas id="tempChart"></canvas>
+                </div>
             </div>
-            <div class="bg-slate-900/50 rounded-xl p-4 border border-slate-600">
-                <canvas id="humChart"></canvas>
+            
+            <div class="glass-panel p-4 sm:p-6 flex flex-col relative h-[300px] md:h-full">
+                <h3 class="text-slate-500 text-xs sm:text-sm font-semibold mb-2 sm:mb-4 ml-1">Humidity History</h3>
+                <div class="flex-1 w-full h-full relative min-h-0">
+                    <canvas id="humChart"></canvas>
+                </div>
             </div>
-        </div>
 
+        </div>
     </div>
 
     <script>
-        // --- REPLACE THESE WITH YOUR THINGSPEAK DETAILS ---
+        // ThingSpeak Configuration - Fetching 40 results to populate graph initially
         const CHANNEL_ID = '3440426'; 
-        const READ_API_KEY = '<THINGSPEAK_READ_API_KEY>';
-        // --------------------------------------------------
+        const READ_API_KEY = 'YOUR_API_KEY_PLACEHOLDER';
+        const MAX_DATA_POINTS = 40;
+        const URL = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${READ_API_KEY}&results=${MAX_DATA_POINTS}`;
 
-        const URL = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${READ_API_KEY}&results=1`;
-
-        // We store the last entry ID so we don't plot the exact same data point twice 
-        // if the browser checks before the ESP32 has uploaded a new one.
         let lastEntryId = null;
 
-        // Chart Configuration Variables
-        const MAX_DATA_POINTS = 30; // Keeps the graph from getting too squished over time
+        // Chart.js global config for minimalist look
+        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.color = '#94a3b8';
 
-        // Common Chart.js options for a clean, dark-mode look
         const commonOptions = {
             responsive: true,
-            maintainAspectRatio: false,
+            maintainAspectRatio: false, // Ensures it fills the relative parent perfectly
             scales: {
-                x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
-                y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+                x: { 
+                    display: true,
+                    grid: { display: false },
+                    border: { display: false },
+                    ticks: {
+                        maxTicksLimit: 6,
+                        maxRotation: 0,
+                        font: { size: 10 },
+                        color: '#94a3b8'
+                    }
+                },
+                y: { 
+                    display: true,
+                    border: { display: false },
+                    grid: { 
+                        color: 'rgba(0,0,0,0.03)',
+                        tickLength: 0,
+                    },
+                    ticks: {
+                        padding: 10,
+                        font: { size: 11, weight: '500' },
+                        color: '#64748b'
+                    }
+                }
             },
-            plugins: { legend: { display: false } },
-            animation: { duration: 400 }
+            plugins: { 
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                    titleColor: '#1e293b',
+                    bodyColor: '#475569',
+                    borderColor: 'rgba(0,0,0,0.05)',
+                    borderWidth: 1,
+                    padding: 12,
+                    boxPadding: 6,
+                    usePointStyle: true,
+                    titleFont: { size: 12, weight: '600' },
+                    bodyFont: { size: 14 },
+                    cornerRadius: 16,
+                    caretSize: 6
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'index',
+            },
+            elements: {
+                line: {
+                    tension: 0.4, // Smooth interpolation
+                    borderWidth: 3
+                },
+                point: {
+                    radius: 0, // Hide points by default for clean line
+                    hitRadius: 20,
+                    hoverRadius: 6,
+                    hoverBackgroundColor: '#ffffff',
+                    hoverBorderWidth: 3
+                }
+            },
+            animation: { duration: 800, easing: 'easeOutQuart' }
         };
 
-        // Initialize Temperature Chart
+        function createGradient(ctx, colorStart, colorEnd) {
+            const gradient = ctx.createLinearGradient(0, 0, 0, 350);
+            gradient.addColorStop(0, colorStart);
+            gradient.addColorStop(1, colorEnd);
+            return gradient;
+        }
+
+        // Initialize Charts
         const ctxTemp = document.getElementById('tempChart').getContext('2d');
+        const tempGradient = createGradient(ctxTemp, 'rgba(56, 189, 248, 0.3)', 'rgba(56, 189, 248, 0.0)');
         const tempChart = new Chart(ctxTemp, {
             type: 'line',
-            data: {
-                labels: [], 
-                datasets: [{
-                    label: 'Temperature (°C)',
-                    borderColor: '#60a5fa', // blue-400
-                    backgroundColor: 'rgba(96, 165, 250, 0.1)',
-                    borderWidth: 3,
-                    pointRadius: 4,
-                    pointBackgroundColor: '#60a5fa',
-                    fill: true,
-                    data: []
-                }]
-            },
-            options: { ...commonOptions, plugins: { title: { display: true, text: 'Temperature Trend', color: '#94a3b8' }, legend: { display: false } } }
+            data: { labels: [], datasets: [{
+                label: 'Temperature °C',
+                borderColor: '#38bdf8', backgroundColor: tempGradient,
+                hoverBorderColor: '#0284c7', fill: true, data: []
+            }]},
+            options: commonOptions
         });
 
-        // Initialize Humidity Chart
         const ctxHum = document.getElementById('humChart').getContext('2d');
+        const humGradient = createGradient(ctxHum, 'rgba(52, 211, 153, 0.3)', 'rgba(52, 211, 153, 0.0)');
         const humChart = new Chart(ctxHum, {
             type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: 'Humidity (%)',
-                    borderColor: '#34d399', // emerald-400
-                    backgroundColor: 'rgba(52, 211, 153, 0.1)',
-                    borderWidth: 3,
-                    pointRadius: 4,
-                    pointBackgroundColor: '#34d399',
-                    fill: true,
-                    data: []
-                }]
-            },
-            options: { ...commonOptions, plugins: { title: { display: true, text: 'Humidity Trend', color: '#94a3b8' }, legend: { display: false } } }
+            data: { labels: [], datasets: [{
+                label: 'Humidity %',
+                borderColor: '#34d399', backgroundColor: humGradient,
+                hoverBorderColor: '#059669', fill: true, data: []
+            }]},
+            options: commonOptions
         });
 
-        // Function to fetch data and update charts
         async function fetchSensorData() {
             try {
                 const response = await fetch(URL);
                 const data = await response.json();
+                
+                let didUpdateChart = false;
 
                 if (data.feeds && data.feeds.length > 0) {
-                    const latestFeed = data.feeds[0];
                     
-                    // Only update if it's a genuinely new data point from the ESP32
-                    if (latestFeed.entry_id !== lastEntryId) {
-                        lastEntryId = latestFeed.entry_id;
-
-                        const temp = parseFloat(latestFeed.field1).toFixed(1);
-                        const hum = parseFloat(latestFeed.field2).toFixed(1);
+                    // Iterate through all historical feeds fetched
+                    data.feeds.forEach(feed => {
                         
-                        // Extract just the HH:MM:SS part of the timestamp
-                        const timeString = new Date(latestFeed.created_at).toLocaleTimeString();
+                        // Check if it's a completely new data point
+                        if (lastEntryId === null || feed.entry_id > lastEntryId) {
+                            lastEntryId = feed.entry_id;
 
-                        // Update large numbers text
-                        document.getElementById('temp-val').innerText = temp;
-                        document.getElementById('hum-val').innerText = hum;
-                        document.getElementById('last-updated').innerText = `Live status: Synchronized at ${timeString}`;
+                            const temp = parseFloat(feed.field1).toFixed(1);
+                            const hum = parseFloat(feed.field2).toFixed(1);
+                            const timeString = new Date(feed.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-                        // Update Charts Arrays
-                        tempChart.data.labels.push(timeString);
-                        tempChart.data.datasets[0].data.push(temp);
+                            // Add points to chart arrays
+                            tempChart.data.labels.push(timeString);
+                            tempChart.data.datasets[0].data.push(temp);
 
-                        humChart.data.labels.push(timeString);
-                        humChart.data.datasets[0].data.push(hum);
-
-                        // If we have more than MAX_DATA_POINTS, remove the oldest one from the left
-                        if (tempChart.data.labels.length > MAX_DATA_POINTS) {
-                            tempChart.data.labels.shift();
-                            tempChart.data.datasets[0].data.shift();
+                            humChart.data.labels.push(timeString);
+                            humChart.data.datasets[0].data.push(hum);
                             
-                            humChart.data.labels.shift();
-                            humChart.data.datasets[0].data.shift();
+                            didUpdateChart = true;
                         }
+                    });
 
-                        // Tell Chart.js to redraw with the new arrays
+                    // Manage Sliding Window: If array size exceeds MAX, shift the oldest off the front
+                    while (tempChart.data.labels.length > MAX_DATA_POINTS) {
+                        tempChart.data.labels.shift();
+                        tempChart.data.datasets[0].data.shift();
+                        humChart.data.labels.shift();
+                        humChart.data.datasets[0].data.shift();
+                    }
+
+                    // Apply visually if we found new data
+                    if (didUpdateChart) {
                         tempChart.update();
                         humChart.update();
+
+                        // Update current UI value using the very last point in the feeds array
+                        const latestFeed = data.feeds[data.feeds.length - 1];
+                        const currentTemp = parseFloat(latestFeed.field1).toFixed(1);
+                        const currentHum = parseFloat(latestFeed.field2).toFixed(1);
+
+                        updateTextFade('temp-val', currentTemp);
+                        updateTextFade('hum-val', currentHum);
+                    }
+
+                    // Always evaluate live status based on the latest available point
+                    const absoluteLatestFeed = data.feeds[data.feeds.length - 1];
+                    const feedTime = new Date(absoluteLatestFeed.created_at);
+                    const currentTimeString = feedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    
+                    const timeDiff = Date.now() - feedTime.getTime();
+                    const statusDot = document.getElementById('status-dot');
+                    const statusText = document.getElementById('status-text');
+                    const lastUpdated = document.getElementById('last-updated');
+                    
+                    if (timeDiff > 120000) { // Older than 2 minutes (120,000 ms)
+                        statusDot.className = "w-2.5 h-2.5 bg-slate-400 rounded-full";
+                        statusText.innerText = "Offline";
+                        statusText.className = "text-xs sm:text-sm font-semibold tracking-wide text-slate-500 uppercase";
+                        lastUpdated.innerText = `Connection lost. Last seen at ${currentTimeString}`;
+                    } else {
+                        statusDot.className = "w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]";
+                        statusText.innerText = "Live Sync";
+                        statusText.className = "text-xs sm:text-sm font-semibold tracking-wide text-emerald-600 uppercase";
+                        lastUpdated.innerText = `Live status: Synchronized at ${currentTimeString}`;
                     }
                 }
             } catch (error) {
                 console.error("Error fetching data:", error);
-                document.getElementById('last-updated').innerText = "Connection warning: Retrying...";
+                document.getElementById('last-updated').innerText = "Attempting to reconnect...";
             }
         }
 
-        // Fetch immediately, then every 20 seconds
+        // Helper function for smooth number transitions
+        function updateTextFade(id, newValue) {
+            const el = document.getElementById(id);
+            if (el.innerText !== newValue && el.innerText !== '--') {
+                el.style.opacity = '0';
+                setTimeout(() => {
+                    el.innerText = newValue;
+                    el.style.opacity = '1';
+                }, 150);
+            } else {
+                el.innerText = newValue;
+            }
+        }
+
+        // Start fetching process
         fetchSensorData();
-        setInterval(fetchSensorData, 20000);
+        setInterval(fetchSensorData, 20000); // Check for new points every 20 seconds
+        
+        // Listen for browser resize to correct chart dimension scaling dynamically
+        window.addEventListener('resize', () => {
+            tempChart.resize();
+            humChart.resize();
+        });
     </script>
 </body>
 </html>
